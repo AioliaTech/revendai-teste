@@ -148,14 +148,14 @@ def filtrar_veiculos(vehicles, filtros, valormax=None):
                         current_field_match_score = 0.0
                         if palavra_q_norm in texto_normalizado_campo_veiculo:
                             current_field_match_score = 100.0 # Pontuação máxima para substring exata
-                        elif len(palavra_q_norm) >= 2: # Permite fuzzy para palavras com 2+ caracteres
+                        elif len(palavra_q_norm) >= 4: # Permite fuzzy para palavras com 4+ caracteres
                             # Usar partial_ratio é geralmente bom para encontrar uma palavra menor em um texto maior
                             score_partial = fuzz.partial_ratio(texto_normalizado_campo_veiculo, palavra_q_norm)
                             # Ratio pode ser útil se o texto do campo for de tamanho similar à palavra
                             score_ratio = fuzz.ratio(texto_normalizado_campo_veiculo, palavra_q_norm)
                             
                             achieved_score = max(score_partial, score_ratio)
-                            if achieved_score >= 70: # Limiar de similaridade
+                            if achieved_score >= 75: # Limiar de similaridade
                                 current_field_match_score = achieved_score
                         
                         if current_field_match_score > best_score_for_this_q_word_in_vehicle:
