@@ -16,7 +16,7 @@ app = FastAPI()
 # Bloco de Configuração para OpenRouter com a chave diretamente no código
 try:
     # --- ⚠️ ATENÇÃO: COLOQUE SUA CHAVE DA OPENROUTER AQUI ⚠️ ---
-    openrouter_key = "sk-or-v1-sua-chave-completa-da-openrouter-aqui"
+    openrouter_key = "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"
     # -----------------------------------------------------------------
 
     if not openrouter_key or "sua-chave" in openrouter_key:
