@@ -15,16 +15,22 @@ app = FastAPI()
 
 # Bloco de Configuração para OpenRouter
 
+# Bloco de Configuração com TESTE DE DEPURAÇÃO
 try:
-    # --- ⚠️ COLE SUA CHAVE REAL DA OPENROUTER AQUI ⚠️ ---
+    # Cole sua chave da OpenRouter aqui
     openrouter_key = "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"
-    # -----------------------------------------------------------
+
+    # --- LINHA DE TESTE ---
+    # Vamos imprimir a chave que o Python está realmente lendo.
+    print("--- INICIANDO VERIFICAÇÃO DA CHAVE ---")
+    print(f"A chave que o código está lendo é: '{openrouter_key}'")
+    print("--- FIM DA VERIFICAÇÃO ---")
+    # ---------------------
 
     if not openrouter_key or "sua-chave" in openrouter_key:
-        print("ALERTA: A chave da OpenRouter não foi definida no código.")
+        print("ALERTA: A verificação de segurança falhou. A chave não foi substituída corretamente.")
         client = None
     else:
-        # Criamos o cliente da OpenAI, mas apontando para a OpenRouter
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=openrouter_key,
@@ -32,7 +38,7 @@ try:
         print("INFO: Cliente OpenRouter configurado com sucesso.")
 
 except Exception as e:
-    print(f"ERRO: Não foi possível configurar o cliente OpenRouter. Detalhes: {e}")
+    print(f"ERRO GERAL NA CONFIGURAÇÃO: {e}")
     client = None
 
 
