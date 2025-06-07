@@ -12,21 +12,19 @@ import os
 
 app = FastAPI()
 
-# Bloco de Configuração com a chave de API diretamente no código
+# Bloco de Configuração CORRETO e SIMPLIFICADO
 try:
-    # --- ⚠️ ATENÇÃO: COLOQUE SUA CHAVE DE API REAL AQUI ⚠️ ---
-    # Este método não é seguro. Sua chave ficará exposta no código.
+    # Sua chave de API real
     api_key = "AIzaSyDVUKbebnCg48Rhjsrtf7wvzYu6CppCTFQ"
-    # -----------------------------------------------------------------
 
-    if not api_key or api_key == "AIzaSyDVUKbebnCg48Rhjsrtf7wvzYu6CppCTFQ":
-        print("ALERTA: A chave de API não foi definida no código. A busca inteligente irá falhar.")
-    else:
-        genai.configure(api_key=api_key)
-        print("INFO: Chave de API configurada diretamente no código.")
+    # Configura a chave diretamente. A verificação 'if' foi removida.
+    genai.configure(api_key=api_key)
+
+    print("INFO: Chave de API configurada com sucesso.")
 
 except Exception as e:
-    print(f"ERRO: Não foi possível configurar a API do Gemini. Detalhes: {e}")
+    # Este 'except' será ativado se a chave for inválida ou houver outro problema.
+    print(f"ERRO: A chave de API é inválida ou houve um problema de conexão. Detalhes: {e}")
 
 
 # Modelo Pydantic para o corpo da requisição
