@@ -5,5 +5,4 @@ requests
 apscheduler
 unidecode
 rapidfuzz
-google-generativeai
-python-dotenv
+openai
