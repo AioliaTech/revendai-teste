@@ -139,7 +139,7 @@ async def parse_query_with_openrouter(user_query: str) -> dict:
     try:
         # Chamada à API no formato da OpenAI
         chat_completion = await client.chat.completions.create(
-            model="google/gemini-2.5-flash",  # <--- Nome do modelo na OpenRouter
+            model="google/gemini-2.5-flash-preview",  # <--- Nome do modelo na OpenRouter
             response_format={"type": "json_object"}, # <--- Força a resposta a ser um JSON válido
             messages=[
                 {"role": "system", "content": system_prompt},
