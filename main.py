@@ -19,7 +19,7 @@ try:
     api_key = "AIzaSyDVUKbebnCg48Rhjsrtf7wvzYu6CppCTFQ"
     # -----------------------------------------------------------------
 
-    if not api_key or api_key == "SUA_CHAVE_SECRETA_VAI_AQUI":
+    if not api_key or api_key == "AIzaSyDVUKbebnCg48Rhjsrtf7wvzYu6CppCTFQ":
         print("ALERTA: A chave de API não foi definida no código. A busca inteligente irá falhar.")
     else:
         genai.configure(api_key=api_key)
