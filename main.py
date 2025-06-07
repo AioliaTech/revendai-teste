@@ -339,10 +339,10 @@ def filtrar_veiculos(vehicles, filtros, valormax=None):
 
 @app.on_event("startup")
 def agendar_tarefas():
-     scheduler = BackgroundScheduler(timezone="America/Sao_Paulo") # Exemplo de timezone
-     scheduler.add_job(fetch_and_convert_xml, "cron", hour="0,12")
-     scheduler.start()
-     fetch_and_convert_xml()
+    scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
+    scheduler.add_job(fetch_and_convert_xml, "cron", hour="0,12")
+    scheduler.start()
+    fetch_and_convert_xml()
 
 # --- NOVO: Endpoint de Busca Inteligente ---
 @app.post("/api/busca-inteligente")
