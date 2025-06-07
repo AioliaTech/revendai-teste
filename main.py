@@ -32,7 +32,7 @@ try:
         client = None
     else:
         client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
+            base_url="https://openrouter.ai/api/v1/chat/completions",
             api_key=openrouter_key,
         )
         print("INFO: Cliente OpenRouter configurado com sucesso.")
