@@ -103,7 +103,7 @@ except ImportError:
 # --- 3. Lógica Principal de Busca ---
 
 async def parse_query_with_gemini(user_query: str) -> dict:
-    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+    model = genai.GenerativeModel('gemini-2.5-flash-latest')
     prompt = f"""
     Você é um assistente especialista em vendas de carros. Sua tarefa é analisar a frase de um cliente
     e extrair os parâmetros de busca em um formato JSON.
