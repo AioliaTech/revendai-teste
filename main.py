@@ -1,10 +1,11 @@
+# Versão completa e adaptada para OpenRouter
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from unidecode import unidecode
 from rapidfuzz import fuzz
 from apscheduler.schedulers.background import BackgroundScheduler
-import google.generativeai as genai
+from openai import OpenAI  # <-- MUDANÇA: Nova importação
 import json
 import os
 
@@ -12,29 +13,35 @@ import os
 
 app = FastAPI()
 
-# Bloco de Configuração CORRETO e SIMPLIFICADO
+# Bloco de Configuração para OpenRouter com a chave diretamente no código
 try:
-    # Sua chave de API real
-    api_key = "AIzaSyDVUKbebnCg48Rhjsrtf7wvzYu6CppCTFQ"
+    # --- ⚠️ ATENÇÃO: COLOQUE SUA CHAVE DA OPENROUTER AQUI ⚠️ ---
+    openrouter_key = "sk-or-v1-sua-chave-completa-da-openrouter-aqui"
+    # -----------------------------------------------------------------
 
-    # Configura a chave diretamente. A verificação 'if' foi removida.
-    genai.configure(api_key=api_key)
-
-    print("INFO: Chave de API configurada com sucesso.")
+    if not openrouter_key or "sua-chave" in openrouter_key:
+        print("ALERTA: A chave da OpenRouter não foi definida no código.")
+        client = None
+    else:
+        # Criamos o cliente da OpenAI, mas apontando para a OpenRouter
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=openrouter_key,
+        )
+        print("INFO: Cliente OpenRouter configurado com sucesso.")
 
 except Exception as e:
-    # Este 'except' será ativado se a chave for inválida ou houver outro problema.
-    print(f"ERRO: A chave de API é inválida ou houve um problema de conexão. Detalhes: {e}")
+    print(f"ERRO: Não foi possível configurar o cliente OpenRouter. Detalhes: {e}")
+    client = None
 
 
-# Modelo Pydantic para o corpo da requisição
+# Modelo Pydantic para o corpo da requisição (continua o mesmo)
 class NaturalLanguageQuery(BaseModel):
     query: str
 
 
-# --- 2. Dados e Funções Auxiliares ---
+# --- 2. Dados e Funções Auxiliares (sem alterações) ---
 
-# Presumo que este arquivo exista. Se não, comente as linhas que o usam.
 try:
     from xml_fetcher import fetch_and_convert_xml
 except ImportError:
@@ -42,7 +49,7 @@ except ImportError:
     def fetch_and_convert_xml():
         print("Função 'fetch_and_convert_xml' não implementada.")
 
-
+# ... (MAPEAMENTO_CATEGORIAS e outras funções auxiliares continuam aqui, sem alteração) ...
 MAPEAMENTO_CATEGORIAS = {
     "gol": "Hatch", "uno": "Hatch", "palio": "Hatch", "celta": "Hatch", "ka": "Hatch", "fiesta": "Hatch", "march": "Hatch",
     "sandero": "Hatch", "onix": "Hatch", "hb20": "Hatch", "i30": "Hatch", "golf": "Hatch", "polo": "Hatch", "fox": "Hatch",
@@ -110,52 +117,39 @@ def get_price_for_sort(price_val):
 
 # --- 3. Lógica de Busca ---
 
-async def parse_query_with_gemini(user_query: str) -> dict:
-    model = genai.GenerativeModel('gemini-1.5-pro-latest')
-    prompt = f"""
-    Você é um assistente especialista em vendas de carros, mestre em interpretar o que os clientes querem. Sua tarefa é analisar a frase de um cliente e traduzi-la em um objeto JSON de filtros de busca, de forma estrita e precisa.
-    A saída DEVE ser APENAS o objeto JSON, sem nenhum texto, explicação ou formatação extra.
-
-    Os campos JSON possíveis e suas regras são:
-    - "modelo": string
-    - "marca": string
-    - "categoria": string (Valores: "Hatch", "Sedan", "SUV", "Caminhonete", etc.)
-    - "ano_min": integer (Ex: "a partir de 2020", "2020 em diante")
-    - "ano_max": integer (Ex: "até 2018", "no máximo 2018")
-    - "km_max": integer (Ex: "abaixo de 50 mil km", "no máximo 50000 km")
-    - "preco_min": float (Ex: "a partir de 80 mil", "entre 80 e 100 mil")
-    - "preco_max": float (Ex: "até 100 mil", "na faixa dos 100 mil")
-    - "cambio": string ("automatico" ou "manual")
-    - "combustivel": string (Ex: "gasolina", "flex", "diesel", "eletrico")
-    - "cor": string
-    - "opcionais": string (palavras-chave separadas por vírgula. Ex: "teto solar,banco de couro")
-    - "excluir_marcas": array de strings (Ex: "não quero Fiat", "exceto Chevrolet")
-
-    ---
-    EXEMPLO:
-    Frase do cliente: "Queria um carro econômico para a família, que não seja da Fiat. Pode ser hatch ou sedan. Tem que ter multimídia e ser entre 80 e 95 mil."
-    JSON esperado:
-    {{
-      "opcionais": "economico,familia,multimidia",
-      "categoria": "Hatch,Sedan",
-      "excluir_marcas": ["fiat"],
-      "preco_min": 80000.0,
-      "preco_max": 95000.0
-    }}
-    ---
-    Agora, analise esta frase do cliente e gere o JSON correspondente:
-    Frase do cliente: "{user_query}"
-    """
-    try:
-        response = await model.generate_content_async(prompt)
-        cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
-        filtros = json.loads(cleaned_response)
-        return filtros
-    except Exception as e:
-        print(f"Erro ao analisar a query com IA: {e}")
+# <-- MUDANÇA: Função reescrita para usar a API da OpenAI/OpenRouter
+async def parse_query_with_openrouter(user_query: str) -> dict:
+    if not client:
+        print("ERRO: Cliente OpenRouter não está configurado. A busca inteligente não pode prosseguir.")
         return {}
 
+    # Instruções para a IA
+    system_prompt = """
+    Você é um assistente especialista em vendas de carros. Sua tarefa é analisar a frase de um cliente e traduzi-la em um objeto JSON de filtros de busca. A saída deve ser apenas o objeto JSON.
+    Campos possíveis: "modelo", "marca", "categoria", "ano_min", "ano_max", "km_max", "preco_min", "preco_max", "cambio", "combustivel", "cor", "opcionais", "excluir_marcas".
+    """
+    
+    try:
+        # Chamada à API no formato da OpenAI
+        chat_completion = await client.chat.completions.create(
+            model="google/gemini-2.5-flash",  # <--- Nome do modelo na OpenRouter
+            response_format={"type": "json_object"}, # <--- Força a resposta a ser um JSON válido
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_query},
+            ]
+        )
+        
+        # Extrai e carrega o JSON da resposta
+        response_content = chat_completion.choices[0].message.content
+        filtros = json.loads(response_content)
+        return filtros
 
+    except Exception as e:
+        print(f"Erro ao analisar a query com OpenRouter: {e}")
+        return {}
+
+# ... (Sua função `filtrar_veiculos` original continua aqui, sem alteração) ...
 def filtrar_veiculos(vehicles, filtros, valormax=None):
     campos_fuzzy = ["modelo", "titulo"]
     vehicles_processados = list(vehicles)
@@ -260,11 +254,13 @@ async def intelligent_search(nl_query: NaturalLanguageQuery):
         data = json.load(f)
     vehicles = data.get("veiculos", [])
 
-    filtros_ia = await parse_query_with_gemini(nl_query.query)
+    # <-- MUDANÇA: Chamando a nova função
+    filtros_ia = await parse_query_with_openrouter(nl_query.query)
+    
     if not filtros_ia:
-        raise HTTPException(status_code=500, detail="Não foi possível processar a busca com a IA.")
+        raise HTTPException(status_code=500, detail="Não foi possível processar a busca com a IA via OpenRouter.")
 
-    valormax = filtros_ia.pop("ValorMax", None)
+    valormax = filtros_ia.pop("preco_max", None) # <-- MUDANÇA: Ajustado para o nome do filtro do novo prompt
     resultado = filtrar_veiculos(vehicles, filtros_ia.copy(), valormax)
 
     return JSONResponse(content={
@@ -273,6 +269,7 @@ async def intelligent_search(nl_query: NaturalLanguageQuery):
         "total_encontrado": len(resultado)
     })
 
+# ... (Seu endpoint GET /api/data continua aqui, sem alteração) ...
 @app.get("/api/data")
 def get_data(request: Request):
     if not os.path.exists("data.json"):
