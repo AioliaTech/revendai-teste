@@ -1,81 +1,103 @@
-# Versão completa e limpa do arquivo main.py
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from unidecode import unidecode
 from rapidfuzz import fuzz
 from apscheduler.schedulers.background import BackgroundScheduler
-from pydantic import BaseModel
-from dotenv import load_dotenv
 import google.generativeai as genai
 import json
 import os
 
-# --- 1. Configuração Inicial ---
+# --- 1. Configuração da API ---
+
 app = FastAPI()
 
-# Carrega as variáveis de ambiente do arquivo .env
-load_dotenv()
-
-# Configura a API Key do Gemini
+# Bloco de Configuração com a chave de API diretamente no código
 try:
-    api_key = os.getenv("AIzaSyDVUKbebnCg48Rhjsrtf7wvzYu6CppCTFQ")
-    if not api_key:
-        print("ERRO: A variável de ambiente GEMINI_API_KEY não foi encontrada.")
+    # --- ⚠️ ATENÇÃO: COLOQUE SUA CHAVE DE API REAL AQUI ⚠️ ---
+    # Este método não é seguro. Sua chave ficará exposta no código.
+    api_key = "SUA_CHAVE_SECRETA_VAI_AQUI"
+    # -----------------------------------------------------------------
+
+    if not api_key or api_key == "SUA_CHAVE_SECRETA_VAI_AQUI":
+        print("ALERTA: A chave de API não foi definida no código. A busca inteligente irá falhar.")
     else:
         genai.configure(api_key=api_key)
+        print("INFO: Chave de API configurada diretamente no código.")
+
 except Exception as e:
     print(f"ERRO: Não foi possível configurar a API do Gemini. Detalhes: {e}")
 
-# Modelo Pydantic para a requisição de busca inteligente
+
+# Modelo Pydantic para o corpo da requisição
 class NaturalLanguageQuery(BaseModel):
     query: str
 
 
 # --- 2. Dados e Funções Auxiliares ---
+
+# Presumo que este arquivo exista. Se não, comente as linhas que o usam.
+try:
+    from xml_fetcher import fetch_and_convert_xml
+except ImportError:
+    print("AVISO: 'xml_fetcher.py' não encontrado. A busca de dados agendada será desativada.")
+    def fetch_and_convert_xml():
+        print("Função 'fetch_and_convert_xml' não implementada.")
+
+
 MAPEAMENTO_CATEGORIAS = {
-    # Hatch
-    "gol": "Hatch", "uno": "Hatch", "palio": "Hatch", "celta": "Hatch", "ka": "Hatch",
-    "fiesta": "Hatch", "march": "Hatch", "sandero": "Hatch", "onix": "Hatch", "hb20": "Hatch",
-    "i30": "Hatch", "golf": "Hatch", "polo": "Hatch", "fox": "Hatch", "up": "Hatch",
-    "fit": "Hatch", "city": "Hatch", "yaris": "Hatch", "etios": "Hatch", "clio": "Hatch",
-    "corsa": "Hatch", "bravo": "Hatch", "punto": "Hatch", "208": "Hatch", "argo": "Hatch",
-    "mobi": "Hatch", "c3": "Hatch", "picanto": "Hatch", "astra hatch": "Hatch", "stilo": "Hatch",
-    "focus hatch": "Hatch", "206": "Hatch", "c4 vtr": "Hatch", "kwid": "Hatch", "soul": "Hatch",
-    "agile": "Hatch", "sonic hatch": "Hatch", "fusca": "Hatch",
-    # Sedan
-    "civic": "Sedan", "corolla": "Sedan", "sentra": "Sedan", "versa": "Sedan", "jetta": "Sedan",
-    "prisma": "Sedan", "voyage": "Sedan", "siena": "Sedan", "grand siena": "Sedan", "cruze": "Sedan",
-    "cobalt": "Sedan", "logan": "Sedan", "fluence": "Sedan", "cerato": "Sedan", "elantra": "Sedan",
-    "virtus": "Sedan", "accord": "Sedan", "altima": "Sedan", "fusion": "Sedan", "mazda3": "Sedan",
+    "gol": "Hatch", "uno": "Hatch", "palio": "Hatch", "celta": "Hatch", "ka": "Hatch", "fiesta": "Hatch", "march": "Hatch",
+    "sandero": "Hatch", "onix": "Hatch", "hb20": "Hatch", "i30": "Hatch", "golf": "Hatch", "polo": "Hatch", "fox": "Hatch",
+    "up": "Hatch", "fit": "Hatch", "city": "Hatch", "yaris": "Hatch", "etios": "Hatch", "clio": "Hatch", "corsa": "Hatch",
+    "bravo": "Hatch", "punto": "Hatch", "208": "Hatch", "argo": "Hatch", "mobi": "Hatch", "c3": "Hatch", "picanto": "Hatch",
+    "astra hatch": "Hatch", "stilo": "Hatch", "focus hatch": "Hatch", "206": "Hatch", "c4 vtr": "Hatch", "kwid": "Hatch",
+    "soul": "Hatch", "agile": "Hatch", "sonic hatch": "Hatch", "fusca": "Hatch", "civic": "Sedan", "corolla": "Sedan",
+    "sentra": "Sedan", "versa": "Sedan", "jetta": "Sedan", "prisma": "Sedan", "voyage": "Sedan", "siena": "Sedan",
+    "grand siena": "Sedan", "cruze": "Sedan", "cobalt": "Sedan", "logan": "Sedan", "fluence": "Sedan", "cerato": "Sedan",
+    "elantra": "Sedan", "virtus": "Sedan", "accord": "Sedan", "altima": "Sedan", "fusion": "Sedan", "mazda3": "Sedan",
     "mazda6": "Sedan", "passat": "Sedan", "city sedan": "Sedan", "astra sedan": "Sedan", "vectra sedan": "Sedan",
     "classic": "Sedan", "cronos": "Sedan", "linea": "Sedan", "focus sedan": "Sedan", "ka sedan": "Sedan",
-    "408": "Sedan", "c4 pallas": "Sedan", "polo sedan": "Sedan", "bora": "Sedan", "hb20s": "Sedan",
-    "lancer": "Sedan", "camry": "Sedan", "onix plus": "Sedan",
-    # SUV
-    "duster": "SUV", "ecosport": "SUV", "hrv": "SUV", "compass": "SUV", "renegade": "SUV",
-    "tracker": "SUV", "kicks": "SUV", "captur": "SUV", "creta": "SUV", "tucson": "SUV",
-    "santa fe": "SUV", "sorento": "SUV", "sportage": "SUV", "outlander": "SUV", "asx": "SUV",
-    "pajero": "SUV", "tr4": "SUV", "aircross": "SUV", "tiguan": "SUV", "t-cross": "SUV",
-    "rav4": "SUV", "cx5": "SUV", "forester": "SUV", "wrx": "SUV", "land cruiser": "SUV",
-    "cherokee": "SUV", "grand cherokee": "SUV", "xtrail": "SUV", "murano": "SUV", "cx9": "SUV",
-    "edge": "SUV", "trailblazer": "SUV", "pulse": "SUV", "fastback": "SUV", "territory": "SUV",
-    "bronco sport": "SUV", "2008": "SUV", "3008": "SUV", "c4 cactus": "SUV", "taos": "SUV",
-    "cr-v": "SUV", "corolla cross": "SUV", "sw4": "SUV", "pajero sport": "SUV", "commander": "SUV",
-    "xv": "SUV", "xc60": "SUV", "tiggo 5x": "SUV", "haval h6": "SUV", "nivus": "SUV",
-    # Caminhonete
-    "hilux": "Caminhonete", "ranger": "Caminhonete", "s10": "Caminhonete", "l200": "Caminhonete", "triton": "Caminhonete",
-    "saveiro": "Utilitário", "strada": "Utilitário", "montana": "Utilitário", "oroch": "Utilitário",
-    "toro": "Caminhonete",
-    "frontier": "Caminhonete", "amarok": "Caminhonete", "gladiator": "Caminhonete", "maverick": "Caminhonete", "colorado": "Caminhonete",
-    "dakota": "Caminhonete", "montana (nova)": "Caminhonete", "f-250": "Caminhonete", "courier (pickup)": "Caminhonete", "hoggar": "Caminhonete",
-    "ram 1500": "Caminhonete",
-    # Outras categorias...
+    "408": "Sedan", "c4 pallas": "Sedan", "polo sedan": "Sedan", "bora": "Sedan", "hb20s": "Sedan", "lancer": "Sedan",
+    "camry": "Sedan", "onix plus": "Sedan", "duster": "SUV", "ecosport": "SUV", "hrv": "SUV", "compass": "SUV",
+    "renegade": "SUV", "tracker": "SUV", "kicks": "SUV", "captur": "SUV", "creta": "SUV", "tucson": "SUV",
+    "santa fe": "SUV", "sorento": "SUV", "sportage": "SUV", "outlander": "SUV", "asx": "SUV", "pajero": "SUV",
+    "tr4": "SUV", "aircross": "SUV", "tiguan": "SUV", "t-cross": "SUV", "rav4": "SUV", "cx5": "SUV", "forester": "SUV",
+    "wrx": "SUV", "land cruiser": "SUV", "cherokee": "SUV", "grand cherokee": "SUV", "xtrail": "SUV", "murano": "SUV",
+    "cx9": "SUV", "edge": "SUV", "trailblazer": "SUV", "pulse": "SUV", "fastback": "SUV", "territory": "SUV",
+    "bronco sport": "SUV", "2008": "SUV", "3008": "SUV", "c4 cactus": "SUV", "taos": "SUV", "cr-v": "SUV",
+    "corolla cross": "SUV", "sw4": "SUV", "pajero sport": "SUV", "commander": "SUV", "xv": "SUV", "xc60": "SUV",
+    "tiggo 5x": "SUV", "haval h6": "SUV", "nivus": "SUV", "hilux": "Caminhonete", "ranger": "Caminhonete",
+    "s10": "Caminhonete", "l200": "Caminhonete", "triton": "Caminhonete", "saveiro": "Utilitário",
+    "strada": "Utilitário", "montana": "Utilitário", "oroch": "Utilitário", "toro": "Caminhonete",
+    "frontier": "Caminhonete", "amarok": "Caminhonete", "gladiator": "Caminhonete", "maverick": "Caminhonete",
+    "colorado": "Caminhonete", "dakota": "Caminhonete", "montana (nova)": "Caminhonete", "f-250": "Caminhonete",
+    "courier (pickup)": "Caminhonete", "hoggar": "Caminhonete", "ram 1500": "Caminhonete", "kangoo": "Utilitário",
+    "partner": "Utilitário", "doblo": "Utilitário", "fiorino": "Utilitário", "berlingo": "Utilitário",
+    "express": "Utilitário", "combo": "Utilitário", "kombi": "Utilitário", "doblo cargo": "Utilitário",
+    "kangoo express": "Utilitário", "master": "Furgão", "sprinter": "Furgão", "ducato": "Furgão", "daily": "Furgão",
+    "jumper": "Furgão", "boxer": "Furgão", "trafic": "Furgão", "transit": "Furgão", "vito": "Furgão",
+    "expert (furgão)": "Furgão", "jumpy (furgão)": "Furgão", "scudo (furgão)": "Furgão", "camaro": "Coupe",
+    "mustang": "Coupe", "tt": "Coupe", "supra": "Coupe", "370z": "Coupe", "rx8": "Coupe", "challenger": "Coupe",
+    "corvette": "Coupe", "veloster": "Coupe", "cerato koup": "Coupe", "clk coupe": "Coupe", "a5 coupe": "Coupe",
+    "gt86": "Coupe", "rcz": "Coupe", "brz": "Coupe", "z4": "Conversível", "boxster": "Conversível", "miata": "Conversível",
+    "beetle cabriolet": "Conversível", "slk": "Conversível", "911 cabrio": "Conversível", "tt roadster": "Conversível",
+    "a5 cabrio": "Conversível", "mini cabrio": "Conversível", "206 cc": "Conversível", "eos": "Conversível",
+    "spin": "Minivan", "livina": "Minivan", "caravan": "Minivan", "touran": "Minivan", "parati": "Station Wagon",
+    "quantum": "Station Wagon", "sharan": "Minivan", "zafira": "Minivan", "picasso": "Minivan", "grand c4": "Minivan",
+    "meriva": "Minivan", "scenic": "Minivan", "xsara picasso": "Minivan", "carnival": "Minivan", "idea": "Minivan",
+    "spacefox": "Station Wagon", "golf variant": "Station Wagon", "palio weekend": "Station Wagon",
+    "astra sw": "Station Wagon", "206 sw": "Station Wagon", "a4 avant": "Station Wagon", "fielder": "Station Wagon",
+    "wrangler": "Off-road", "troller": "Off-road", "defender": "Off-road", "bronco": "Off-road", "samurai": "Off-road",
+    "jimny": "Off-road", "land cruiser": "Off-road", "grand vitara": "Off-road", "jimny sierra": "Off-road",
+    "bandeirante (ate 2001)": "Off-road"
 }
 
+def inferir_categoria_por_modelo(modelo_buscado):
+    modelo_norm = normalizar(modelo_buscado)
+    return MAPEAMENTO_CATEGORIAS.get(modelo_norm)
+
 def normalizar(texto: str) -> str:
-    if not isinstance(texto, str):
-        texto = str(texto)
-    return unidecode(texto).lower().replace("-", "").replace(" ", "").strip()
+    return unidecode(str(texto)).lower().replace("-", "").replace(" ", "").strip()
 
 def converter_preco(valor_str):
     try:
@@ -87,46 +109,43 @@ def get_price_for_sort(price_val):
     converted = converter_preco(price_val)
     return converted if converted is not None else float('-inf')
 
-def inferir_categoria_por_modelo(modelo_buscado):
-    modelo_norm = normalizar(modelo_buscado)
-    return MAPEAMENTO_CATEGORIAS.get(modelo_norm)
 
-# Presumo que este arquivo exista. Se não, comente as linhas que o usam.
-try:
-    from xml_fetcher import fetch_and_convert_xml
-except ImportError:
-    print("AVISO: 'xml_fetcher.py' não encontrado. A busca de dados agendada será desativada.")
-    def fetch_and_convert_xml():
-        print("Função 'fetch_and_convert_xml' não implementada.")
-
-
-# --- 3. Lógica Principal de Busca ---
+# --- 3. Lógica de Busca ---
 
 async def parse_query_with_gemini(user_query: str) -> dict:
-    model = genai.GenerativeModel('gemini-2.5-flash-preview')
+    model = genai.GenerativeModel('gemini-2.5-flash-latest')
     prompt = f"""
-    Você é um assistente especialista em vendas de carros. Sua tarefa é analisar a frase de um cliente
-    e extrair os parâmetros de busca em um formato JSON.
+    Você é um assistente especialista em vendas de carros, mestre em interpretar o que os clientes querem. Sua tarefa é analisar a frase de um cliente e traduzi-la em um objeto JSON de filtros de busca, de forma estrita e precisa.
+    A saída DEVE ser APENAS o objeto JSON, sem nenhum texto, explicação ou formatação extra.
 
-    Os campos JSON possíveis são:
+    Os campos JSON possíveis e suas regras são:
     - "modelo": string
     - "marca": string
-    - "categoria": string (Valores possíveis: Hatch, Sedan, SUV, Caminhonete, Utilitário, Furgão, Coupe, Conversível, Minivan, Station Wagon, Off-road)
-    - "ano_min": integer
-    - "ano_max": integer
-    - "km_max": integer
-    - "ValorMax": float (sem R$ ou pontos, ex: 150000.0)
-    - "cambio": string (Valores: "automatico" ou "manual")
-    - "combustivel": string (Ex: "gasolina", "flex", "diesel")
+    - "categoria": string (Valores: "Hatch", "Sedan", "SUV", "Caminhonete", etc.)
+    - "ano_min": integer (Ex: "a partir de 2020", "2020 em diante")
+    - "ano_max": integer (Ex: "até 2018", "no máximo 2018")
+    - "km_max": integer (Ex: "abaixo de 50 mil km", "no máximo 50000 km")
+    - "preco_min": float (Ex: "a partir de 80 mil", "entre 80 e 100 mil")
+    - "preco_max": float (Ex: "até 100 mil", "na faixa dos 100 mil")
+    - "cambio": string ("automatico" ou "manual")
+    - "combustivel": string (Ex: "gasolina", "flex", "diesel", "eletrico")
     - "cor": string
-    - "opcionais": string (palavras-chave separadas por vírgula, ex: "teto solar,banco de couro")
+    - "opcionais": string (palavras-chave separadas por vírgula. Ex: "teto solar,banco de couro")
+    - "excluir_marcas": array de strings (Ex: "não quero Fiat", "exceto Chevrolet")
 
-    Regras Importantes:
-    1. Se o cliente disser "de 2020 para frente" ou "a partir de 2020", use "ano_min": 2020.
-    2. Se o cliente disser "até 100 mil reais", use "ValorMax": 100000.
-    3. Se o cliente mencionar características, coloque em "opcionais". Ex: "carro para família" -> "opcionais": "familiar,espaçoso".
-    4. A saída DEVE ser APENAS o objeto JSON, sem nenhum texto adicional.
-
+    ---
+    EXEMPLO:
+    Frase do cliente: "Queria um carro econômico para a família, que não seja da Fiat. Pode ser hatch ou sedan. Tem que ter multimídia e ser entre 80 e 95 mil."
+    JSON esperado:
+    {{
+      "opcionais": "economico,familia,multimidia",
+      "categoria": "Hatch,Sedan",
+      "excluir_marcas": ["fiat"],
+      "preco_min": 80000.0,
+      "preco_max": 95000.0
+    }}
+    ---
+    Agora, analise esta frase do cliente e gere o JSON correspondente:
     Frase do cliente: "{user_query}"
     """
     try:
@@ -138,71 +157,86 @@ async def parse_query_with_gemini(user_query: str) -> dict:
         print(f"Erro ao analisar a query com IA: {e}")
         return {}
 
+
 def filtrar_veiculos(vehicles, filtros, valormax=None):
-    campos_fuzzy = ["modelo", "titulo", "opcionais"]
+    campos_fuzzy = ["modelo", "titulo"]
     vehicles_processados = list(vehicles)
 
-    # Inicializa campos temporários
     for v in vehicles_processados:
         v['_relevance_score'] = 0.0
         v['_matched_word_count'] = 0
 
-    # Filtros de faixa (ano/km)
-    ano_min = filtros.pop("ano_min", None)
-    ano_max = filtros.pop("ano_max", None)
-    km_max = filtros.pop("km_max", None)
-    
-    veiculos_filtrados_faixa = []
-    for v in vehicles_processados:
-        passou = True
-        if ano_min and int(v.get("ano_fabricacao", 0)) < int(ano_min):
-            passou = False
-        if ano_max and int(v.get("ano_fabricacao", 0)) > int(ano_max):
-            passou = False
-        if km_max and int(v.get("km", 999999)) > int(km_max):
-            passou = False
-        
-        if passou:
-            veiculos_filtrados_faixa.append(v)
-    vehicles_processados = veiculos_filtrados_faixa
-
-    # Filtros exatos e fuzzy
     active_fuzzy_filter_applied = False
+
     for chave_filtro, valor_filtro in filtros.items():
         if not valor_filtro:
             continue
-
         veiculos_que_passaram_nesta_chave = []
         if chave_filtro in campos_fuzzy:
-            # Lógica de busca fuzzy (simplificada para brevidade, mas igual à sua)
             active_fuzzy_filter_applied = True
-            palavras_query = [normalizar(p) for p in str(valor_filtro).split() if p.strip()]
+            palavras_query_originais = str(valor_filtro).split()
+            palavras_query_normalizadas = [normalizar(p) for p in palavras_query_originais if p.strip()]
+            palavras_query_normalizadas = [p for p in palavras_query_normalizadas if p]
+            if not palavras_query_normalizadas:
+                vehicles_processados = []
+                break
             for v in vehicles_processados:
-                # ... sua lógica fuzzy aqui ...
-                pass # Substitua este 'pass' pela sua lógica de fuzzy matching
-        else: # Lógica para campos de correspondência exata
-            termo_normalizado = normalizar(valor_filtro)
-            for v in vehicles_processados:
-                valor_campo = v.get(chave_filtro, "")
-                if normalizar(valor_campo) == termo_normalizado:
+                vehicle_score_for_this_filter = 0.0
+                vehicle_matched_words_for_this_filter = 0
+                for palavra_q_norm in palavras_query_normalizadas:
+                    if not palavra_q_norm:
+                        continue
+                    best_score_for_this_q_word_in_vehicle = 0.0
+                    for nome_campo_fuzzy_veiculo in campos_fuzzy:
+                        conteudo_original_campo_veiculo = v.get(nome_campo_fuzzy_veiculo, "")
+                        if not conteudo_original_campo_veiculo:
+                            continue
+                        texto_normalizado_campo_veiculo = normalizar(str(conteudo_original_campo_veiculo))
+                        if not texto_normalizado_campo_veiculo:
+                            continue
+                        current_field_match_score = 0.0
+                        if palavra_q_norm in texto_normalizado_campo_veiculo:
+                            current_field_match_score = 100.0
+                        elif len(palavra_q_norm) >= 4:
+                            score_partial = fuzz.partial_ratio(texto_normalizado_campo_veiculo, palavra_q_norm)
+                            score_ratio = fuzz.ratio(texto_normalizado_campo_veiculo, palavra_q_norm)
+                            achieved_score = max(score_partial, score_ratio)
+                            if achieved_score >= 75:
+                                current_field_match_score = achieved_score
+                        if current_field_match_score > best_score_for_this_q_word_in_vehicle:
+                            best_score_for_this_q_word_in_vehicle = current_field_match_score
+                    if best_score_for_this_q_word_in_vehicle > 0:
+                        vehicle_score_for_this_filter += best_score_for_this_q_word_in_vehicle
+                        vehicle_matched_words_for_this_filter += 1
+                if vehicle_matched_words_for_this_filter > 0:
+                    v['_relevance_score'] += vehicle_score_for_this_filter
+                    v['_matched_word_count'] += vehicle_matched_words_for_this_filter
                     veiculos_que_passaram_nesta_chave.append(v)
-        
+        else:
+            termo_normalizado_para_comparacao = normalizar(valor_filtro)
+            for v in vehicles_processados:
+                valor_campo_veiculo = v.get(chave_filtro, "")
+                if normalizar(str(valor_campo_veiculo)) == termo_normalizado_para_comparacao:
+                    veiculos_que_passaram_nesta_chave.append(v)
         vehicles_processados = veiculos_que_passaram_nesta_chave
         if not vehicles_processados:
             break
 
-    # Ordenação (simplificada, adicione a sua lógica de relevância aqui)
-    vehicles_processados.sort(key=lambda v: get_price_for_sort(v.get("preco")), reverse=True)
+    if active_fuzzy_filter_applied:
+        vehicles_processados = [v for v in vehicles_processados if v['_matched_word_count'] > 0]
+        vehicles_processados.sort(key=lambda v: (v['_matched_word_count'], v['_relevance_score'], get_price_for_sort(v.get("preco"))), reverse=True)
+    else:
+        vehicles_processados.sort(key=lambda v: get_price_for_sort(v.get("preco")), reverse=True)
     
-    # Filtro de preço máximo
     if valormax:
         try:
-            teto = float(valormax) * 1.3
-            vehicles_processados = [v for v in vehicles_processados if get_price_for_sort(v.get("preco")) <= teto]
-        except (ValueError, TypeError):
-            pass
+            teto = float(valormax)
+            max_price_limit = teto * 1.3
+            vehicles_filtrados_preco = [v for v in vehicles_processados if get_price_for_sort(v.get("preco")) is not None and get_price_for_sort(v.get("preco")) <= max_price_limit]
+            vehicles_processados = vehicles_filtrados_preco
+        except ValueError:
+            return []
 
-    # Limpa as chaves temporárias
     for v in vehicles_processados:
         v.pop('_relevance_score', None)
         v.pop('_matched_word_count', None)
@@ -215,10 +249,8 @@ def filtrar_veiculos(vehicles, filtros, valormax=None):
 @app.on_event("startup")
 def agendar_tarefas():
     scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
-    # Roda a cada 12 horas
     scheduler.add_job(fetch_and_convert_xml, "cron", hour="0,12")
     scheduler.start()
-    # Roda uma vez na inicialização
     fetch_and_convert_xml()
 
 @app.post("/api/busca-inteligente")
@@ -246,21 +278,31 @@ async def intelligent_search(nl_query: NaturalLanguageQuery):
 @app.get("/api/data")
 def get_data(request: Request):
     if not os.path.exists("data.json"):
-        return JSONResponse(content={"error": "Nenhum dado disponível"}, status_code=404)
+        return JSONResponse(content={"error": "Nenhum dado disponível", "resultados": [], "total_encontrado": 0}, status_code=404)
 
     try:
         with open("data.json", "r", encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError:
-        return JSONResponse(content={"error": "Erro ao ler os dados"}, status_code=500)
+        return JSONResponse(content={"error": "Erro ao ler os dados (JSON inválido)", "resultados": [], "total_encontrado": 0}, status_code=500)
 
-    vehicles = data.get("veiculos", [])
+    try:
+        vehicles = data["veiculos"]
+        if not isinstance(vehicles, list):
+            return JSONResponse(content={"error": "Formato de dados inválido (veiculos não é uma lista)", "resultados": [], "total_encontrado": 0}, status_code=500)
+    except KeyError:
+        return JSONResponse(content={"error": "Formato de dados inválido (chave 'veiculos' não encontrada)", "resultados": [], "total_encontrado": 0}, status_code=500)
+
     query_params = dict(request.query_params)
     valormax = query_params.pop("ValorMax", None)
-    
-    filtros = {k: v for k, v in query_params.items() if v}
+    filtros_originais = {
+        "modelo": query_params.get("modelo"),
+        "marca": query_params.get("marca"),
+        "categoria": query_params.get("categoria")
+    }
+    filtros_ativos = {k: v for k, v in filtros_originais.items() if v}
 
-    resultado = filtrar_veiculos(vehicles, filtros, valormax)
+    resultado = filtrar_veiculos(vehicles, filtros_ativos, valormax)
 
     if resultado:
         return JSONResponse(content={
@@ -268,11 +310,46 @@ def get_data(request: Request):
             "total_encontrado": len(resultado)
         })
 
-    # Lógica de busca alternativa (pode ser expandida ou simplificada)
+    # Lógica de busca alternativa
+    alternativas = []
+    filtros_alternativa1 = {k: v for k, v in filtros_originais.items() if v}
+    alt1 = filtrar_veiculos(vehicles, filtros_alternativa1)
+    if alt1:
+        alternativas = alt1
+    else:
+        if filtros_originais.get("modelo"):
+            filtros_so_modelo = {"modelo": filtros_originais["modelo"]}
+            alt2 = filtrar_veiculos(vehicles, filtros_so_modelo, valormax)
+            if alt2:
+                alternativas = alt2
+            else:
+                modelo_para_inferencia = filtros_originais.get("modelo")
+                if modelo_para_inferencia:
+                    categoria_inferida = inferir_categoria_por_modelo(modelo_para_inferencia)
+                    if categoria_inferida:
+                        filtros_categoria_inferida = {"categoria": categoria_inferida}
+                        alt3 = filtrar_veiculos(vehicles, filtros_categoria_inferida, valormax)
+                        if alt3:
+                            alternativas = alt3
+                        else:
+                            alt4 = filtrar_veiculos(vehicles, filtros_categoria_inferida)
+                            if alt4:
+                                alternativas = alt4
+    
+    if alternativas:
+        alternativas_formatadas = [{"titulo": v.get("titulo", ""), "preco": v.get("preco", "")} for v in alternativas[:10]]
+        return JSONResponse(content={
+            "resultados": [],
+            "total_encontrado": 0,
+            "instrucao_ia": "Não encontramos veículos com os parâmetros informados dentro do valor desejado. Seguem as opções mais próximas.",
+            "alternativa": {
+                "resultados": alternativas_formatadas,
+                "total_encontrado": len(alternativas_formatadas)
+            }
+        })
+
     return JSONResponse(content={
         "resultados": [],
         "total_encontrado": 0,
-        "instrucao_ia": "Não encontramos veículos com os parâmetros informados."
+        "instrucao_ia": "Não encontramos veículos com os parâmetros informados e também não encontramos opções próximas."
     })
-
-# Para rodar localmente: uvicorn main:app --reload
