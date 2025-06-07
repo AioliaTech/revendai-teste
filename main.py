@@ -113,7 +113,7 @@ def get_price_for_sort(price_val):
 # --- 3. Lógica de Busca ---
 
 async def parse_query_with_gemini(user_query: str) -> dict:
-    model = genai.GenerativeModel('gemini-2.5-flash-preview')
+    model = genai.GenerativeModel('gemini-2.5-flash-preview-05-20')
     prompt = f"""
     Você é um assistente especialista em vendas de carros, mestre em interpretar o que os clientes querem. Sua tarefa é analisar a frase de um cliente e traduzi-la em um objeto JSON de filtros de busca, de forma estrita e precisa.
     A saída DEVE ser APENAS o objeto JSON, sem nenhum texto, explicação ou formatação extra.
